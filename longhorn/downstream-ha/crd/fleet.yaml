@@ -3,7 +3,7 @@ defaultNamespace: longhorn-system
 helm:
   repo: https://charts.rancher.io
   chart: longhorn-crd
-  version: "108.3.1+up1.11.2"
+  version: "108.2.1+up1.10.2"
   releaseName: longhorn-crd
 diff:
   comparePatches:
