@@ -29,5 +29,6 @@ defaultSettings:
   #backupTarget: s3://
   #backupTargetCredentialSecret: longhorn-backup-secret
   concurrentAutomaticEngineUpgradePerNodeLimit: 1
+  concurrentReplicaRebuildPerNodeLimit: 1
 persistence:
   defaultClass: false  
