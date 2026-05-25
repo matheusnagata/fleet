@@ -1,0 +1,12 @@
+name: longhorn-app-dha
+defaultNamespace: longhorn-system
+takeOwnership: true
+dependsOn:
+  - name: longhorn-crd-dha
+helm:
+  repo: https://charts.rancher.io
+  chart: longhorn
+  version: "107.1.1+up1.9.2"
+  releaseName: longhorn
+  valuesFiles:
+    - values.yaml

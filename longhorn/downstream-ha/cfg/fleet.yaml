@@ -1,0 +1,5 @@
+name: longhorn-cfg-dha
+defaultNamespace: longhorn-system
+# This tells Fleet: "Do not deploy configurations until the core app is finished"
+dependsOn:
+  - name: longhorn-app-dha

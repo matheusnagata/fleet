@@ -1,0 +1,33 @@
+global:
+  cattle:
+    # -- Default system registry.
+    systemDefaultRegistry: "registry.rancher.com"
+    windowsCluster:
+      # -- Setting that allows Longhorn to run on a Rancher Windows cluster.
+      enabled: false
+      # -- Toleration for Linux nodes that can run user-deployed Longhorn components.
+      tolerations:
+      - key: "cattle.io/os"
+        value: "linux"
+        effect: "NoSchedule"
+        operator: "Equal"
+      # -- Node selector for Linux nodes that can run user-deployed Longhorn components.
+      nodeSelector:
+        kubernetes.io/os: "linux"
+      defaultSetting:
+        # -- Toleration for system-managed Longhorn components.
+        taintToleration: cattle.io/os=linux:NoSchedule
+        # -- Node selector for system-managed Longhorn components.
+        systemManagedComponentsNodeSelector: kubernetes.io/os:linux
+defaultSettings:
+  storageMinimalAvailablePercentage: 5
+  storageOverProvisioningPercentage: 1000
+  defaultReplicaCount: 3
+  storageReservedPercentageForDefaultDisk: 5
+  createDefaultDiskLabeledNodes: true
+  deletingConfirmationFlag: true
+  #backupTarget: s3://
+  #backupTargetCredentialSecret: longhorn-backup-secret
+  concurrentAutomaticEngineUpgradePerNodeLimit: 1
+persistence:
+  defaultClass: false  
