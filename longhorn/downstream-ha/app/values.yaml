@@ -24,7 +24,7 @@ defaultSettings:
   storageOverProvisioningPercentage: 1000
   defaultReplicaCount: 3
   storageReservedPercentageForDefaultDisk: 5
-  createDefaultDiskLabeledNodes: true
+  createDefaultDiskLabeledNodes: false
   deletingConfirmationFlag: true
   #backupTarget: s3://
   #backupTargetCredentialSecret: longhorn-backup-secret
