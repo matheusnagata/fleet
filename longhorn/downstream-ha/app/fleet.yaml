@@ -8,5 +8,6 @@ helm:
   chart: longhorn
   version: "108.2.1+up1.10.2"
   releaseName: longhorn
+  timeoutSeconds: 1800
   valuesFiles:
     - values.yaml
