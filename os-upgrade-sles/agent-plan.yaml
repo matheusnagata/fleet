@@ -6,7 +6,7 @@ metadata:
   namespace: cattle-system
 spec:
   # In common scenarios, worker nodes can be upgraded in parallel depending on capacity.
-  concurrency: 2
+  concurrency: 1
   nodeSelector:
     matchExpressions:
       # Target all nodes that are NOT control planes
