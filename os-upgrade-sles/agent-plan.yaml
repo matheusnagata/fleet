@@ -18,19 +18,29 @@ spec:
     ignoreDaemonSets: true
     deleteLocalData: true
   
-  # Guardrail: Wait for all control-plane nodes to have the os-server-plan completion label
+  # Guardrail: Wait for all control-plane nodes to have the latest os-server-plan hash
   prepare:
     image: rancher/rke2-upgrade:v1.35.7-rke2r1
     command: ["/bin/sh", "-c"]
     args:
       - |
         echo "Waiting for os-server-plan to complete on all control-plane nodes..."
+        
+        # 1. Dynamically fetch the expected hash of the server plan
+        SERVER_HASH=$(kubectl get plan os-server-plan -n cattle-system -o jsonpath='{.status.latestHash}')
+        if [ -z "$SERVER_HASH" ]; then
+          echo "Error: Could not retrieve os-server-plan hash. Retrying in next loop..."
+          exit 1
+        fi
+        echo "Target Server Hash: $SERVER_HASH"
+        
         while true; do
-          # Check if any control-plane node is missing the server plan completion label
-          PENDING_NODES=$(kubectl get nodes --selector=node-role.kubernetes.io/control-plane -l !plan.upgrade.cattle.io/os-server-plan --no-headers | wc -l)
+          # 2. Check control-plane nodes specifically for a mismatch against the latest hash
+          # Using a single -l flag prevents Kubernetes from dropping filters
+          PENDING_NODES=$(kubectl get nodes -l "node-role.kubernetes.io/control-plane=true,plan.upgrade.cattle.io/os-server-plan!=$SERVER_HASH" --no-headers 2>/dev/null | wc -l)
           
           if [ "$PENDING_NODES" -eq 0 ]; then
-            echo "All control-plane nodes have completed the server plan. Proceeding."
+            echo "All control-plane nodes are updated to hash $SERVER_HASH. Proceeding."
             exit 0
           fi
           
@@ -50,4 +60,4 @@ spec:
       path: /host/run/system-upgrade/secrets/update
   
   # Must match the version string in the server-plan
-  version: sles-20260826-retryboth
+  version: sles-20260826-retryboth2
