@@ -20,7 +20,7 @@ spec:
   
   # Guardrail: Wait for the server plan to complete successfully
   prepare:
-    image: rancher/rke2-upgrade
+    image: rancher/rke2-upgrade:v1.35.7-rke2r1
     args:
       - prepare
       - os-server-plan
