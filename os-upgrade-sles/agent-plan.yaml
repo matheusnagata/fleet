@@ -1,0 +1,40 @@
+# agent-plan.yaml
+apiVersion: upgrade.cattle.io/v1
+kind: Plan
+metadata:
+  name: os-agent-plan
+  namespace: cattle-system
+spec:
+  # In common scenarios, worker nodes can be upgraded in parallel depending on capacity.
+  concurrency: 2
+  nodeSelector:
+    matchExpressions:
+      # Target all nodes that are NOT control planes
+      - {key: node-role.kubernetes.io/control-plane, operator: NotIn, values: ["true"]}
+  serviceAccountName: system-upgrade-controller
+  cordon: true
+  drain:
+    force: true
+    ignoreDaemonSets: true
+    deleteLocalData: true
+  
+  # Guardrail: Wait for the server plan to complete successfully
+  prepare:
+    image: rancher/rke2-upgrade
+    args:
+      - prepare
+      - os-server-plan
+  
+  # Main upgrade execution container
+  upgrade:
+    image: registry.suse.com/bci/bci-base:latest
+    command: ["chroot", "/host"]
+    args: ["sh", "/run/system-upgrade/secrets/update/upgrade.sh"]
+  
+  # Mount the execution script
+  secrets:
+    - name: sles-os-upgrade-script
+      path: /host/run/system-upgrade/secrets/update
+  
+  # Must match the version string in the server-plan
+  version: sles-20260826
