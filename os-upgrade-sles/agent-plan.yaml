@@ -18,12 +18,25 @@ spec:
     ignoreDaemonSets: true
     deleteLocalData: true
   
-  # Guardrail: Wait for the server plan to complete successfully
+  # Guardrail: Wait for all control-plane nodes to have the os-server-plan completion label
   prepare:
     image: rancher/rke2-upgrade:v1.35.7-rke2r1
+    command: ["/bin/sh", "-c"]
     args:
-      - prepare
-      - os-server-plan
+      - |
+        echo "Waiting for os-server-plan to complete on all control-plane nodes..."
+        while true; do
+          # Check if any control-plane node is missing the server plan completion label
+          PENDING_NODES=$(kubectl get nodes --selector=node-role.kubernetes.io/control-plane -l !plan.upgrade.cattle.io/os-server-plan --no-headers | wc -l)
+          
+          if [ "$PENDING_NODES" -eq 0 ]; then
+            echo "All control-plane nodes have completed the server plan. Proceeding."
+            exit 0
+          fi
+          
+          echo "Still waiting for $PENDING_NODES control-plane node(s) to finish..."
+          sleep 10
+        done
   
   # Main upgrade execution container
   upgrade:
@@ -37,4 +50,4 @@ spec:
       path: /host/run/system-upgrade/secrets/update
   
   # Must match the version string in the server-plan
-  version: sles-20260826-retry3
+  version: sles-20260826-retry4
