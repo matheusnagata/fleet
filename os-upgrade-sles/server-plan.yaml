@@ -7,6 +7,8 @@ metadata:
 spec:
   # Control plane nodes must always upgrade one at a time to maintain quorum
   concurrency: 1
+  tolerations:
+    - operator: Exists
   nodeSelector:
     matchExpressions:
       - {key: node-role.kubernetes.io/control-plane, operator: In, values: ["true"]}
@@ -46,4 +48,4 @@ spec:
   
   # The version string acts as an execution trigger. 
   # Update this string (e.g., sles-20260901) to trigger future OS updates.
-  version: sles-20260827
+  version: sles-20260827-retry1

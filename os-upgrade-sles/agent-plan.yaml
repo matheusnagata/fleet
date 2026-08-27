@@ -7,6 +7,8 @@ metadata:
 spec:
   # In common scenarios, worker nodes can be upgraded in parallel depending on capacity.
   concurrency: 1
+  tolerations:
+    - operator: Exists
   nodeSelector:
     matchExpressions:
       # Target all nodes that are NOT control planes
@@ -60,4 +62,4 @@ spec:
       path: /host/run/system-upgrade/secrets/update
   
   # Must match the version string in the server-plan
-  version: sles-20260827
+  version: sles-20260827-retry1
