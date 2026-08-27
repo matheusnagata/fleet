@@ -1,6 +1,7 @@
-## ⚠️ IMPORTANT NOTICE: Lab Use Only ⚠️
 
-**This repository and the configurations described within are intended for personal homelab, learning, and experimentation purposes ONLY. This setup is NOT designed, configured, or secured for production environments. Using these configurations in a production setting is strongly discouraged and is done at your own risk.**
+> [!CAUTION]
+> This repository is built for **learning and experimentation**. 
+> While some configurations may function as expected, they are not guaranteed to meet production standards for security, stability, or performance. Use in production environments at your own risk.
 
 ### Project Architecture and Workflow
 
