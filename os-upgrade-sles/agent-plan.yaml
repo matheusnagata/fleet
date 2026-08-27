@@ -7,6 +7,8 @@ metadata:
 spec:
   # In common scenarios, worker nodes can be upgraded in parallel depending on capacity.
   concurrency: 1
+  # Add this parameter to disable the job timeout
+  jobActiveDeadlineSecs: 0
   tolerations:
     - operator: Exists
   nodeSelector:
@@ -21,6 +23,7 @@ spec:
     deleteLocalData: true
   
   # Guardrail: Wait for all control-plane nodes to have the latest os-server-plan hash
+  # Guardrail: Wait for all control-plane nodes to have the latest os-server-plan hash
   prepare:
     image: rancher/rke2-upgrade:v1.35.7-rke2r1
     command: ["/bin/sh", "-c"]
@@ -28,25 +31,34 @@ spec:
       - |
         echo "Waiting for os-server-plan to complete on all control-plane nodes..."
         
-        # 1. Dynamically fetch the expected hash of the server plan
+        # 1. Fetch the expected hash of the server plan
         SERVER_HASH=$(kubectl get plan os-server-plan -n cattle-system -o jsonpath='{.status.latestHash}')
         if [ -z "$SERVER_HASH" ]; then
-          echo "Error: Could not retrieve os-server-plan hash. Retrying in next loop..."
+          echo "Error: Could not retrieve os-server-plan hash."
           exit 1
         fi
         echo "Target Server Hash: $SERVER_HASH"
         
         while true; do
-          # 2. Check control-plane nodes specifically for a mismatch against the latest hash
-          # Using a single -l flag prevents Kubernetes from dropping filters
-          PENDING_NODES=$(kubectl get nodes -l "node-role.kubernetes.io/control-plane=true,plan.upgrade.cattle.io/os-server-plan!=$SERVER_HASH" --no-headers 2>/dev/null | wc -l)
+          # 2. Hard check: Is the API server reachable?
+          if ! kubectl get nodes >/dev/null 2>&1; then
+            echo "API Server is temporarily unavailable. Waiting..."
+            sleep 10
+            continue
+          fi
           
-          if [ "$PENDING_NODES" -eq 0 ]; then
-            echo "All control-plane nodes are updated to hash $SERVER_HASH. Proceeding."
+          # 3. Explicitly count total nodes vs updated nodes
+          TOTAL_CP=$(kubectl get nodes -l "node-role.kubernetes.io/control-plane=true" --no-headers | wc -l)
+          UPDATED_CP=$(kubectl get nodes -l "node-role.kubernetes.io/control-plane=true,plan.upgrade.cattle.io/os-server-plan=$SERVER_HASH" --no-headers | wc -l)
+          
+          # 4. Only proceed if we have nodes, and 100% of them match the hash
+          if [ "$TOTAL_CP" -gt 0 ] && [ "$TOTAL_CP" -eq "$UPDATED_CP" ]; then
+            echo "All $TOTAL_CP control-plane nodes are updated to hash $SERVER_HASH. Proceeding."
             exit 0
           fi
           
-          echo "Still waiting for $PENDING_NODES control-plane node(s) to finish..."
+          PENDING=$((TOTAL_CP - UPDATED_CP))
+          echo "Still waiting for $PENDING control-plane node(s) to finish..."
           sleep 10
         done
   
@@ -62,4 +74,4 @@ spec:
       path: /host/run/system-upgrade/secrets/update
   
   # Must match the version string in the server-plan
-  version: sles-20260827
+  version: sles-20260827-retry1
