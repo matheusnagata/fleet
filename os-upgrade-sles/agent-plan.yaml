@@ -62,4 +62,4 @@ spec:
       path: /host/run/system-upgrade/secrets/update
   
   # Must match the version string in the server-plan
-  version: sles-20260827-retry1
+  version: sles-20260827
