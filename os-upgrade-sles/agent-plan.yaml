@@ -5,15 +5,15 @@ metadata:
   name: os-agent-plan
   namespace: cattle-system
 spec:
-  # In common scenarios, worker nodes can be upgraded in parallel depending on capacity.
+  # Depending on the scenario, worker nodes can be upgraded in parallel depending on capacity:
   concurrency: 1
-  # Add this parameter to disable the job timeout
+  # Disable the job timeout:
   jobActiveDeadlineSecs: 0
   tolerations:
     - operator: Exists
   nodeSelector:
     matchExpressions:
-      # Target all nodes that are NOT control planes
+      # Target all nodes that are NOT control planes:
       - {key: node-role.kubernetes.io/control-plane, operator: NotIn, values: ["true"]}
   serviceAccountName: system-upgrade-controller
   cordon: true
@@ -21,10 +21,10 @@ spec:
     force: true
     ignoreDaemonSets: true
     deleteLocalData: true
-  
-  # Guardrail: Wait for all control-plane nodes to have the latest os-server-plan hash
+
   # Guardrail: Wait for all control-plane nodes to have the latest os-server-plan hash
   prepare:
+    # Set image compatible with the clusters version of RKE2:
     image: rancher/rke2-upgrade:v1.35.7-rke2r1
     command: ["/bin/sh", "-c"]
     args:
@@ -73,5 +73,7 @@ spec:
     - name: sles-os-upgrade-script
       path: /host/run/system-upgrade/secrets/update
   
-  # Must match the version string in the server-plan
+  # The version string acts as an execution trigger. 
+  # Update this string (e.g., sles-20260901) to trigger future OS updates.
+  # Ideally must match the version string in the server-plan
   version: sles-20260827
