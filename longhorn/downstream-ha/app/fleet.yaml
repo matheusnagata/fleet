@@ -6,7 +6,7 @@ dependsOn:
 helm:
   repo: https://charts.rancher.io
   chart: longhorn
-  version: "107.1.1+up1.9.2"
+  version: "108.2.1+up1.10.2"
   releaseName: longhorn
   timeoutSeconds: 1800 # Mandatory for large clusters
   valuesFiles:
