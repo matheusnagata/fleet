@@ -1,0 +1,53 @@
+# server-plan.yaml
+apiVersion: upgrade.cattle.io/v1
+kind: Plan
+metadata:
+  name: os-server-plan
+  namespace: cattle-system
+spec:
+  # Upgrade one Control plane node at a time to maintain quorum:
+  concurrency: 1
+  # Disable the job timeout:
+  jobActiveDeadlineSecs: 0
+  tolerations:
+    - operator: Exists
+  nodeSelector:
+    matchExpressions:
+      - {key: node-role.kubernetes.io/control-plane, operator: In, values: ["true"]}
+  serviceAccountName: system-upgrade-controller
+  cordon: true
+  drain:
+    force: true
+    ignoreDaemonSets: true
+    deleteLocalData: true
+  
+  # Guardrail: Check cluster health before proceeding:
+  prepare:
+    # Set image compatible with the clusters version of RKE2:
+    image: rancher/rke2-upgrade:v1.35.7-rke2r1
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "Validating cluster node health..."
+        kubectl get nodes | grep -i "NotReady"
+        if [ $? -eq 0 ]; then
+          echo "ERROR: Cluster contains NotReady nodes. Halting upgrade sequence."
+          exit 1
+        fi
+        echo "Cluster health verified. Proceeding with control plane upgrade."
+        exit 0
+
+  # Main upgrade execution container
+  upgrade:
+    image: registry.suse.com/bci/bci-base:latest
+    command: ["chroot", "/host"]
+    args: ["sh", "/run/system-upgrade/secrets/update/upgrade.sh"]
+  
+  # Mount the execution script
+  secrets:
+    - name: sles-os-upgrade-script
+      path: /host/run/system-upgrade/secrets/update
+  
+  # The version string acts as an execution trigger. 
+  # Update this string (e.g., sles-20260901) to trigger future OS updates.
+  version: sles-20260828

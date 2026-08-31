@@ -8,6 +8,6 @@ helm:
   chart: longhorn
   version: "108.2.1+up1.10.2"
   releaseName: longhorn
-  timeoutSeconds: 1800
+  timeoutSeconds: 1800 # Mandatory for large clusters
   valuesFiles:
     - values.yaml

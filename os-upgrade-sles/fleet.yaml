@@ -1,0 +1,10 @@
+# fleet.yaml
+# Deploys resources to the default SUC namespace, available on downstream clusters deployed via newer version of Rancher.
+defaultNamespace: cattle-system
+
+# This targets all downstream clusters. 
+# Adjust the matchLabels to target specific clusters if needed:
+targetCustomizations:
+  - name: all-clusters
+    clusterSelector:
+      matchLabels: {}

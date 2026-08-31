@@ -19,6 +19,7 @@ global:
         taintToleration: cattle.io/os=linux:NoSchedule
         # -- Node selector for system-managed Longhorn components.
         systemManagedComponentsNodeSelector: kubernetes.io/os:linux
+  # Setting this changes the default Docker registry:
   imageRegistry: "registry.rancher.com"
 defaultSettings:
   storageMinimalAvailablePercentage: 5

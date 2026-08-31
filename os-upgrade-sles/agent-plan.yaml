@@ -1,0 +1,79 @@
+# agent-plan.yaml
+apiVersion: upgrade.cattle.io/v1
+kind: Plan
+metadata:
+  name: os-agent-plan
+  namespace: cattle-system
+spec:
+  # Depending on the scenario, worker nodes can be upgraded in parallel depending on capacity:
+  concurrency: 1
+  # Disable the job timeout:
+  jobActiveDeadlineSecs: 0
+  tolerations:
+    - operator: Exists
+  nodeSelector:
+    matchExpressions:
+      # Target all nodes that are NOT control planes:
+      - {key: node-role.kubernetes.io/control-plane, operator: NotIn, values: ["true"]}
+  serviceAccountName: system-upgrade-controller
+  cordon: true
+  drain:
+    force: true
+    ignoreDaemonSets: true
+    deleteLocalData: true
+
+  # Guardrail: Wait for all control-plane nodes to have the latest os-server-plan hash
+  prepare:
+    # Set image compatible with the clusters version of RKE2:
+    image: rancher/rke2-upgrade:v1.35.7-rke2r1
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "Waiting for os-server-plan to complete on all control-plane nodes..."
+        
+        # 1. Fetch the expected hash of the server plan
+        SERVER_HASH=$(kubectl get plan os-server-plan -n cattle-system -o jsonpath='{.status.latestHash}')
+        if [ -z "$SERVER_HASH" ]; then
+          echo "Error: Could not retrieve os-server-plan hash."
+          exit 1
+        fi
+        echo "Target Server Hash: $SERVER_HASH"
+        
+        while true; do
+          # 2. Hard check: Is the API server reachable?
+          if ! kubectl get nodes >/dev/null 2>&1; then
+            echo "API Server is temporarily unavailable. Waiting..."
+            sleep 10
+            continue
+          fi
+          
+          # 3. Explicitly count total nodes vs updated nodes
+          TOTAL_CP=$(kubectl get nodes -l "node-role.kubernetes.io/control-plane=true" --no-headers | wc -l)
+          UPDATED_CP=$(kubectl get nodes -l "node-role.kubernetes.io/control-plane=true,plan.upgrade.cattle.io/os-server-plan=$SERVER_HASH" --no-headers | wc -l)
+          
+          # 4. Only proceed if we have nodes, and 100% of them match the hash
+          if [ "$TOTAL_CP" -gt 0 ] && [ "$TOTAL_CP" -eq "$UPDATED_CP" ]; then
+            echo "All $TOTAL_CP control-plane nodes are updated to hash $SERVER_HASH. Proceeding."
+            exit 0
+          fi
+          
+          PENDING=$((TOTAL_CP - UPDATED_CP))
+          echo "Still waiting for $PENDING control-plane node(s) to finish..."
+          sleep 10
+        done
+  
+  # Main upgrade execution container
+  upgrade:
+    image: registry.suse.com/bci/bci-base:latest
+    command: ["chroot", "/host"]
+    args: ["sh", "/run/system-upgrade/secrets/update/upgrade.sh"]
+  
+  # Mount the execution script
+  secrets:
+    - name: sles-os-upgrade-script
+      path: /host/run/system-upgrade/secrets/update
+  
+  # The version string acts as an execution trigger. 
+  # Update this string (e.g., sles-20260901) to trigger future OS updates.
+  # Ideally must match the version string in the server-plan
+  version: sles-20260828
