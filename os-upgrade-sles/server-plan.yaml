@@ -23,17 +23,33 @@ spec:
   
   # Guardrail: Check cluster health before proceeding:
   prepare:
-    # Set image compatible with the clusters version of RKE2:
     image: rancher/rke2-upgrade:v1.35.7-rke2r1
     command: ["/bin/sh", "-c"]
     args:
       - |
         echo "Validating cluster node health..."
-        kubectl get nodes | grep -i "NotReady"
-        if [ $? -eq 0 ]; then
+        if kubectl get nodes | grep -i "NotReady"; then
           echo "ERROR: Cluster contains NotReady nodes. Halting upgrade sequence."
           exit 1
         fi
+        
+        # Longhorn Guardrail
+        if kubectl get crd volumes.longhorn.io >/dev/null 2>&1; then
+          echo "Longhorn detected. Verifying volume robustness..."
+          while true; do
+            # Extract the robustness status of all volumes and count degraded/faulted instances
+            DEGRADED_COUNT=$(kubectl get volumes.longhorn.io -n longhorn-system -o jsonpath='{range .items[*]}{.status.robustness}{"\n"}{end}' | grep -ciE 'degraded|faulted' || true)
+            
+            if [ "$DEGRADED_COUNT" -eq 0 ]; then
+              echo "All Longhorn volumes are healthy. Proceeding."
+              break
+            fi
+            
+            echo "Waiting for $DEGRADED_COUNT Longhorn volume(s) to rebuild and sync..."
+            sleep 15
+          done
+        fi
+        
         echo "Cluster health verified. Proceeding with control plane upgrade."
         exit 0
 
