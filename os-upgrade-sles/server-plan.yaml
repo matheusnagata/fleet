@@ -33,19 +33,33 @@ spec:
           exit 1
         fi
         
-        # Longhorn Guardrail
+        # --- NEW LONGHORN GUARDRAIL INSERTION ---
         if kubectl get crd volumes.longhorn.io >/dev/null 2>&1; then
-          echo "Longhorn detected. Verifying volume robustness..."
+          echo "Longhorn detected. Verifying all volumes individually..."
           while true; do
-            # Extract the robustness status of all volumes and count degraded/faulted instances
-            DEGRADED_COUNT=$(kubectl get volumes.longhorn.io -n longhorn-system -o jsonpath='{range .items[*]}{.status.robustness}{"\n"}{end}' | grep -ciE 'degraded|faulted' || true)
+            if ! VOLUME_STATES=$(kubectl get volumes.longhorn.io -n longhorn-system -o jsonpath='{range .items[*]}{.status.robustness}{" "}{end}'); then
+              echo "Error communicating with Longhorn API. Waiting..."
+              sleep 15
+              continue
+            fi
+            
+            DEGRADED_COUNT=0
+            TOTAL_COUNT=0
+            
+            for state in $VOLUME_STATES; do
+              TOTAL_COUNT=$((TOTAL_COUNT + 1))
+              state_lower=$(echo "$state" | tr '[:upper:]' '[:lower:]')
+              if [ "$state_lower" = "degraded" ] || [ "$state_lower" = "faulted" ]; then
+                DEGRADED_COUNT=$((DEGRADED_COUNT + 1))
+              fi
+            done
             
             if [ "$DEGRADED_COUNT" -eq 0 ]; then
-              echo "All Longhorn volumes are healthy. Proceeding."
+              echo "Checked $TOTAL_COUNT volume(s). 0 are degraded/faulted. Proceeding."
               break
             fi
             
-            echo "Waiting for $DEGRADED_COUNT Longhorn volume(s) to rebuild and sync..."
+            echo "Checked $TOTAL_COUNT volume(s). $DEGRADED_COUNT volume(s) are still degraded/faulted. Waiting..."
             sleep 15
           done
         fi

@@ -46,11 +46,27 @@ spec:
           UPDATED_CP=$(kubectl get nodes -l "node-role.kubernetes.io/control-plane=true,plan.upgrade.cattle.io/os-server-plan=$SERVER_HASH" --no-headers | wc -l)
           
           if [ "$TOTAL_CP" -gt 0 ] && [ "$TOTAL_CP" -eq "$UPDATED_CP" ]; then
-            # Server plan is done. Now run the Longhorn Guardrail before breaking the loop.
+            # --- NEW LONGHORN GUARDRAIL INSERTION ---
             if kubectl get crd volumes.longhorn.io >/dev/null 2>&1; then
-              DEGRADED_COUNT=$(kubectl get volumes.longhorn.io -n longhorn-system -o jsonpath='{range .items[*]}{.status.robustness}{"\n"}{end}' | grep -ciE 'degraded|faulted' || true)
+              if ! VOLUME_STATES=$(kubectl get volumes.longhorn.io -n longhorn-system -o jsonpath='{range .items[*]}{.status.robustness}{" "}{end}'); then
+                echo "Error communicating with Longhorn API. Waiting..."
+                sleep 15
+                continue
+              fi
+              
+              DEGRADED_COUNT=0
+              TOTAL_COUNT=0
+              
+              for state in $VOLUME_STATES; do
+                TOTAL_COUNT=$((TOTAL_COUNT + 1))
+                state_lower=$(echo "$state" | tr '[:upper:]' '[:lower:]')
+                if [ "$state_lower" = "degraded" ] || [ "$state_lower" = "faulted" ]; then
+                  DEGRADED_COUNT=$((DEGRADED_COUNT + 1))
+                fi
+              done
+              
               if [ "$DEGRADED_COUNT" -gt 0 ]; then
-                echo "Server plan complete, but waiting for $DEGRADED_COUNT Longhorn volume(s) to rebuild..."
+                echo "Server plan complete, but $DEGRADED_COUNT of $TOTAL_COUNT Longhorn volume(s) are degraded. Waiting..."
                 sleep 15
                 continue
               fi
