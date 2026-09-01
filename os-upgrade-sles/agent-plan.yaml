@@ -95,4 +95,4 @@ spec:
   # The version string acts as an execution trigger. 
   # Update this string (e.g., sles-20260901) to trigger future OS updates.
   # Ideally must match the version string in the server-plan
-  version: sles-20260831
+  version: sles-20260901
