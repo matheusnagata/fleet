@@ -24,36 +24,55 @@ spec:
 
   # Guardrail: Wait for all control-plane nodes to have the latest os-server-plan hash
   prepare:
-    # Set image compatible with the clusters version of RKE2:
     image: rancher/rke2-upgrade:v1.35.7-rke2r1
     command: ["/bin/sh", "-c"]
     args:
       - |
         echo "Waiting for os-server-plan to complete on all control-plane nodes..."
-        
-        # 1. Fetch the expected hash of the server plan
         SERVER_HASH=$(kubectl get plan os-server-plan -n cattle-system -o jsonpath='{.status.latestHash}')
         if [ -z "$SERVER_HASH" ]; then
           echo "Error: Could not retrieve os-server-plan hash."
           exit 1
         fi
-        echo "Target Server Hash: $SERVER_HASH"
         
         while true; do
-          # 2. Hard check: Is the API server reachable?
           if ! kubectl get nodes >/dev/null 2>&1; then
             echo "API Server is temporarily unavailable. Waiting..."
             sleep 10
             continue
           fi
           
-          # 3. Explicitly count total nodes vs updated nodes
           TOTAL_CP=$(kubectl get nodes -l "node-role.kubernetes.io/control-plane=true" --no-headers | wc -l)
           UPDATED_CP=$(kubectl get nodes -l "node-role.kubernetes.io/control-plane=true,plan.upgrade.cattle.io/os-server-plan=$SERVER_HASH" --no-headers | wc -l)
           
-          # 4. Only proceed if we have nodes, and 100% of them match the hash
           if [ "$TOTAL_CP" -gt 0 ] && [ "$TOTAL_CP" -eq "$UPDATED_CP" ]; then
-            echo "All $TOTAL_CP control-plane nodes are updated to hash $SERVER_HASH. Proceeding."
+            # --- NEW LONGHORN GUARDRAIL INSERTION ---
+            if kubectl get crd volumes.longhorn.io >/dev/null 2>&1; then
+              if ! VOLUME_STATES=$(kubectl get volumes.longhorn.io -n longhorn-system -o jsonpath='{range .items[*]}{.status.robustness}{" "}{end}'); then
+                echo "Error communicating with Longhorn API. Waiting..."
+                sleep 15
+                continue
+              fi
+              
+              DEGRADED_COUNT=0
+              TOTAL_COUNT=0
+              
+              for state in $VOLUME_STATES; do
+                TOTAL_COUNT=$((TOTAL_COUNT + 1))
+                state_lower=$(echo "$state" | tr '[:upper:]' '[:lower:]')
+                if [ "$state_lower" = "degraded" ] || [ "$state_lower" = "faulted" ]; then
+                  DEGRADED_COUNT=$((DEGRADED_COUNT + 1))
+                fi
+              done
+              
+              if [ "$DEGRADED_COUNT" -gt 0 ]; then
+                echo "Server plan complete, but $DEGRADED_COUNT of $TOTAL_COUNT Longhorn volume(s) are degraded. Waiting..."
+                sleep 15
+                continue
+              fi
+            fi
+            
+            echo "All control-plane nodes and Longhorn volumes are updated and healthy. Proceeding."
             exit 0
           fi
           
@@ -76,4 +95,4 @@ spec:
   # The version string acts as an execution trigger. 
   # Update this string (e.g., sles-20260901) to trigger future OS updates.
   # Ideally must match the version string in the server-plan
-  version: sles-20260828
+  version: sles-20260901
